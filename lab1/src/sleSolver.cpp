@@ -2,6 +2,7 @@
 
 #include <mpi.h>
 #include <cmath>
+#include <complex>
 #include <stdexcept>
 #include <vector>
 #include <string>
@@ -10,7 +11,7 @@
 sleSolver::sleSolver(const fvector& locMatA, const fvector& globVecB,
 int rank, int commSize) : locMatA(locMatA), globVecB(globVecB),
 globN(static_cast<int>(globVecB.size())),
-locN(static_cast<int>(locMatA.size()) / globN), rank(rank), EPSILON(1e-3) {
+locN(static_cast<int>(locMatA.size()) / globN), rank(rank), EPSILON(5e-7) {
     globX = fvector(globN);
     globY = fvector(globN);
     locX = fvector(locN);
@@ -110,7 +111,7 @@ void sleSolver::solve() {
 
     while (true) {
         computeYAndNorm();
-        if (globNormY / normB < EPSILON) break;
+        if (globNormY < EPSILON * normB) break;
         computeTau();
         computeX();
     }
