@@ -5,14 +5,14 @@
 
 class sleSolver {
  public:
-    using fvector = std::vector<float>;
+    typedef std::vector<float> fvector;
 
     explicit sleSolver(const fvector& locMatA, const fvector& globVecB,
         int rank, int size);
 
     void solve();
-    [[nodiscard]] float getDiff(const std::string& vecXbin) const;
-    [[nodiscard]] fvector getActualX() const;
+    float getDiff(const std::string& vecXbin) const;
+    fvector getActualX() const;
 
  private:
     void computeYAndNorm();
@@ -24,8 +24,8 @@ class sleSolver {
     const int rank;
     std::vector<int> vecSendcounts, vecDispls;
 
-    fvector globX, globY, locY;
+    fvector globX, globY, locX, locY;
     float globTau, globNormY;
 
-    static constexpr float EPSILON = 1e-3;
+    const float EPSILON;
 };

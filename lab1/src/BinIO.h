@@ -5,7 +5,7 @@
 
 class BinIO {
  public:
-    using fvector = std::vector<float>;
+    typedef std::vector<float> fvector;
 
     static fvector readVecFromBin(const std::string& filename);
     static void writeVecToBin(const fvector& vec,

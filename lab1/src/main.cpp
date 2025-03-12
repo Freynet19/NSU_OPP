@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cstdlib>
 
 #include "sleSolver.h"
 #include "BinIO.h"
@@ -9,6 +10,10 @@
 void solveSLE(const std::vector<float>& localMatA,
 const std::vector<float>& vecB, int rank, int commSize) {
     sleSolver solver(localMatA, vecB, rank, commSize);
+    if (rank == 0) {
+        std::cout << "Running with " <<
+            commSize << " processes..." << std::endl;
+    }
 
     const double start = MPI_Wtime();
     solver.solve();
@@ -64,18 +69,14 @@ int main(int argc, char* argv[]) {
         if (rank != 0) vecB.resize(N);
         MPI_Bcast(vecB.data(), N, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
-        auto matSendcounts = std::vector<int>(size);
-        auto matDispls = std::vector<int>(size);
+        std::vector<int> matSendcounts = std::vector<int>(size);
+        std::vector<int> matDispls = std::vector<int>(size);
         prepareScatterv(N, size, matSendcounts, matDispls);
 
         std::vector<float> localMatA(matSendcounts[rank]);
         MPI_Scatterv(matA.data(), matSendcounts.data(),
             matDispls.data(), MPI_FLOAT, localMatA.data(),
             matSendcounts[rank], MPI_FLOAT, 0, MPI_COMM_WORLD);
-        /*std::cout << "Process " << rank
-          << " received " << localMatA.size()
-          << " elements (" << matSendcounts[rank]/N << " rows)"
-          << std::endl;*/
 
         solveSLE(localMatA, vecB, rank, size);
     } catch (const std::runtime_error& e) {

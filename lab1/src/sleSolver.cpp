@@ -10,9 +10,10 @@
 sleSolver::sleSolver(const fvector& locMatA, const fvector& globVecB,
 int rank, int commSize) : locMatA(locMatA), globVecB(globVecB),
 globN(static_cast<int>(globVecB.size())),
-locN(static_cast<int>(locMatA.size()) / globN), rank(rank) {
+locN(static_cast<int>(locMatA.size()) / globN), rank(rank), EPSILON(1e-3) {
     globX = fvector(globN);
     globY = fvector(globN);
+    locX = fvector(locN);
     locY = fvector(locN);
     globTau = globNormY = 0;
     vecSendcounts = std::vector<int>(commSize);
@@ -63,11 +64,8 @@ void sleSolver::computeYAndNorm() {
         globY.data(), vecSendcounts.data(),
         vecDispls.data(), MPI_FLOAT, MPI_COMM_WORLD);
 
-    MPI_Reduce(&locNormY, &globNormY, 1, MPI_FLOAT,
-        MPI_SUM, 0, MPI_COMM_WORLD);
-    if (rank == 0) {
-        globNormY = std::sqrt(globNormY);
-    }
+    MPI_Allreduce(&locNormY, &globNormY, 1, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+    globNormY = std::sqrt(globNormY);
 }
 
 void sleSolver::computeTau() {
@@ -91,7 +89,6 @@ void sleSolver::computeTau() {
 }
 
 void sleSolver::computeX() {
-    auto locX = fvector(locN);
     for (int i = 0; i < locN; i++) {
         locX[i] -= globTau * locY[i];
     }
@@ -101,7 +98,7 @@ void sleSolver::computeX() {
 }
 
 void sleSolver::solve() {
-    float normB = 1;
+    float normB;
     if (rank == 0) {
         normB = 0;
         for (int i = 0; i < globN; ++i) {
@@ -109,18 +106,11 @@ void sleSolver::solve() {
         }
         normB = std::sqrt(normB);
     }
+    MPI_Bcast(&normB, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
-    bool done = false;
     while (true) {
         computeYAndNorm();
-
-        if (rank == 0) {
-            if (globNormY / normB < EPSILON) done = true;
-            // else std::cerr << globNormY / normB << std::endl;
-        }
-        MPI_Bcast(&done, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
-        if (done) break;
-
+        if (globNormY / normB < EPSILON) break;
         computeTau();
         computeX();
     }
