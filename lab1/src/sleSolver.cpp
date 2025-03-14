@@ -2,39 +2,29 @@
 
 #include <mpi.h>
 #include <cmath>
-#include <complex>
 #include <stdexcept>
 #include <vector>
 #include <string>
 #include "BinIO.h"
 
 sleSolver::sleSolver(const fvector& locMatA, const fvector& globVecB,
-int rank, int commSize) : locMatA(locMatA), globVecB(globVecB),
+int rank, const std::vector<int>& vsc, const std::vector<int>& vdp) :
+locMatA(locMatA), globVecB(globVecB),
 globN(static_cast<int>(globVecB.size())),
-locN(static_cast<int>(locMatA.size()) / globN), rank(rank), EPSILON(5e-7) {
+locN(static_cast<int>(locMatA.size()) / globN), rank(rank),
+vecSendcounts(vsc), vecDispls(vdp), EPSILON(4e-7) {
     globX = fvector(globN);
     globY = fvector(globN);
     locX = fvector(locN);
     locY = fvector(locN);
     globTau = globNormY = 0;
-    vecSendcounts = std::vector<int>(commSize);
-    vecDispls = std::vector<int>(commSize);
-
-    const int baseSize = globN / commSize;
-    const int remainder = globN % commSize;
-    int shift = 0;
-    for (int i = 0; i < commSize; ++i) {
-        vecSendcounts[i] = baseSize + (i < remainder);
-        vecDispls[i] = shift;
-        shift += vecSendcounts[i];
-    }
 }
 
 float sleSolver::getDiff(const std::string& vecXbin) const {
     fvector expectedX;
     try {
         expectedX = BinIO::readVecFromBin(vecXbin);
-        if (expectedX.size() != globN) return -1;
+        if (static_cast<int>(expectedX.size()) != globN) return -1;
     } catch (const std::runtime_error&) {
         return -1;
     }
@@ -99,19 +89,15 @@ void sleSolver::computeX() {
 }
 
 void sleSolver::solve() {
-    float normB;
-    if (rank == 0) {
-        normB = 0;
-        for (int i = 0; i < globN; ++i) {
-            normB += globVecB[i] * globVecB[i];
-        }
-        normB = std::sqrt(normB);
+    float normB = 0;
+    for (int i = 0; i < globN; ++i) {
+        normB += globVecB[i] * globVecB[i];
     }
-    MPI_Bcast(&normB, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    normB = std::sqrt(normB);
 
     while (true) {
         computeYAndNorm();
-        if (globNormY < EPSILON * normB) break;
+        if (globNormY / normB < EPSILON) break;
         computeTau();
         computeX();
     }

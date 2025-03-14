@@ -3,34 +3,52 @@
 #include <string>
 #include <vector>
 #include <cstdlib>
+#include <cfloat>
 
 #include "sleSolver.h"
 #include "BinIO.h"
 
+#define LOOPS 8
+
 void solveSLE(const std::vector<float>& localMatA,
 const std::vector<float>& vecB, int rank, int commSize) {
-    sleSolver solver(localMatA, vecB, rank, commSize);
     if (rank == 0) {
         std::cout << "Running with " <<
             commSize << " processes..." << std::endl;
     }
 
-    const double start = MPI_Wtime();
-    solver.solve();
-    const double end = MPI_Wtime();
+    std::vector<int> vecSendcounts = std::vector<int>(commSize);
+    std::vector<int> vecDispls = std::vector<int>(commSize);
+
+    const int baseSize = static_cast<int>(vecB.size()) / commSize;
+    const int remainder = static_cast<int>(vecB.size()) % commSize;
+    int shift = 0;
+    for (int i = 0; i < commSize; ++i) {
+        vecSendcounts[i] = baseSize + (i < remainder);
+        vecDispls[i] = shift;
+        shift += vecSendcounts[i];
+    }
+
+    double duration = DBL_MAX;
+    for (int i = 0; i < LOOPS; i++) {
+        sleSolver solver(localMatA, vecB, rank, vecSendcounts, vecDispls);
+        const double start = MPI_Wtime();
+        solver.solve();
+        const double end = MPI_Wtime();
+        duration = std::min(duration, end - start);
+    }
 
     if (rank == 0) {
-        const double duration = end - start;
         std::cout << "Done! Time taken: " << duration << " sec" << std::endl;
 
         // BinIO::writeVecToBin(solver.getActualX(), "actualX.bin");
 
-        const float diff = solver.getDiff("vecX.bin");
-        const float avg = diff / static_cast<float>(vecB.size());
-        std::cout << "Total diff: " << diff <<
-            " (avg " << avg << ")" << std::endl;
-        std::cout << "--------------------------------" <<
-                     "--------------------------------" << std::endl;
+        // const float diff = solver.getDiff("vecX.bin");
+        // const float avg = diff / static_cast<float>(vecB.size());
+        // std::cout << "Total diff: " << diff <<
+        //     " (avg " << avg << ")" << std::endl;
+        std::cout << "================================" <<
+                     "================================" << std::endl;
     }
 }
 
