@@ -1,3 +1,5 @@
+# only for local testing
+# see .sh scripts for running on cluster
 cmake_minimum_required(VERSION 3.28)
 project(lab1)
 
