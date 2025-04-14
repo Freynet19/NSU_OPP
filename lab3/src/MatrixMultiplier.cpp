@@ -1,7 +1,6 @@
 #include "MatrixMultiplier.h"
 #include <iostream>
 #include <vector>
-#include <algorithm>
 
 MatrixMultiplier::MatrixMultiplier(int size, int rank, int N1, int N2, int N3)
 : gridSize(size), procRank(rank), N1(N1), N2(N2), N3(N3) {
@@ -34,11 +33,10 @@ void MatrixMultiplier::createGrid() {
 }
 
 void MatrixMultiplier::distributeMatA() {
-    int colCommRank, colCommSize;
-    MPI_Comm_rank(COMM_COLUMN, &colCommRank);
+    int colCommSize;
     MPI_Comm_size(COMM_COLUMN, &colCommSize);
-
     int rowCommSize = gridSize / colCommSize;
+
     allLocN1 = std::vector<int>(gridSize);
 
     std::vector<int> sendcounts(colCommSize);
@@ -56,8 +54,8 @@ void MatrixMultiplier::distributeMatA() {
         shift += sendcounts[i];
     }
 
-    const int locSize = sendcounts[colCommRank];
-    locN1 = locSize / N2;
+    locN1 = allLocN1[procRank];
+    const int locSize = locN1 * N2;
     locA = fvector(locSize);
 
     if (procCoords[1] == 0) {
@@ -69,11 +67,10 @@ void MatrixMultiplier::distributeMatA() {
 }
 
 void MatrixMultiplier::distributeMatB() {
-    int rowCommRank, rowCommSize;
-    MPI_Comm_rank(COMM_ROW, &rowCommRank);
+    int rowCommSize;
     MPI_Comm_size(COMM_ROW, &rowCommSize);
-
     int colCommSize = gridSize / rowCommSize;
+
     allLocN3 = std::vector<int>(gridSize);
 
     std::vector<int> sendcounts(rowCommSize);
@@ -90,7 +87,7 @@ void MatrixMultiplier::distributeMatB() {
         shift += sendcounts[i];
     }
 
-    locN3 = sendcounts[rowCommRank];
+    locN3 = allLocN3[procRank];
     const int locSize = locN3 * N2;
     locB = fvector(locSize);
 
@@ -152,23 +149,25 @@ void MatrixMultiplier::gatherMatC() {
         }
     }
 
-    MPI_Datatype bigRow, smallRow;
-    MPI_Type_vector(allLocN1[0], allLocN3[0], N3, MPI_FLOAT, &bigRow);
-    MPI_Type_vector(allLocN1[0], allLocN3[0] - 1, N3, MPI_FLOAT, &smallRow);
-    MPI_Type_create_resized(bigRow, 0, sizeof(float), &bigRow);
-    MPI_Type_create_resized(smallRow, 0, sizeof(float), &smallRow);
-    MPI_Type_commit(&bigRow);
-    MPI_Type_commit(&smallRow);
+    MPI_Datatype bigRowBlock, smallRowBlock;
+    MPI_Type_vector(allLocN1[0], allLocN3[0],
+        N3, MPI_FLOAT, &bigRowBlock);
+    MPI_Type_vector(allLocN1[0], allLocN3[0] - 1,
+        N3, MPI_FLOAT, &smallRowBlock);
+    MPI_Type_create_resized(bigRowBlock, 0, sizeof(float), &bigRowBlock);
+    MPI_Type_create_resized(smallRowBlock, 0, sizeof(float), &smallRowBlock);
+    MPI_Type_commit(&bigRowBlock);
+    MPI_Type_commit(&smallRowBlock);
 
     MPI_Gatherv(locC.data(), bigRowSendcounts[procRank], MPI_FLOAT,
         globC.data(), bigRowRecvcounts.data(), displs.data(),
-        bigRow, 0, MPI_COMM_WORLD);
+        bigRowBlock, 0, MPI_COMM_WORLD);
     MPI_Gatherv(locC.data(), smallRowSendcounts[procRank], MPI_FLOAT,
         globC.data(), smallRowRecvcounts.data(), displs.data(),
-        smallRow, 0, MPI_COMM_WORLD);
+        smallRowBlock, 0, MPI_COMM_WORLD);
 
-    MPI_Type_free(&bigRow);
-    MPI_Type_free(&smallRow);
+    MPI_Type_free(&bigRowBlock);
+    MPI_Type_free(&smallRowBlock);
 }
 
 void MatrixMultiplier::printC() const {

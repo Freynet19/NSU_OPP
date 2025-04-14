@@ -1,9 +1,10 @@
+#include <mpi.h>
 #include <cfloat>
 #include <cstdlib>
-#include <mpi.h>
 #include <iostream>
 #include <string>
 #include <stdexcept>
+#include <algorithm>
 #include "MatrixMultiplier.h"
 
 #define LOOPS 8
