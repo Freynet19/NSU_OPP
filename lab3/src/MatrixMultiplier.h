@@ -3,9 +3,10 @@
 #include <mpi.h>
 #include <vector>
 
+typedef std::vector<float> fvector;
+
 class MatrixMultiplier {
  public:
-    using fvector = std::vector<float>;
     explicit MatrixMultiplier(int size, int rank, int N1, int N2, int N3);
     void locMultiply();
     void gatherMatC();
