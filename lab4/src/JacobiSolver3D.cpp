@@ -9,7 +9,7 @@ JacobiSolver3D::JacobiSolver3D(int rank, int size)
 : procRank(rank), commSize(size),
 x_0(-1), y_0(-1), z_0(-1),
 D_x(2), D_y(2), D_z(2),
-parA(1e5), eps(1e-5),
+parA(1e5), eps(1e-6),
 N_x(400), N_y(400), N_z(400),
 h_x(D_x / (N_x - 1)), h_y(D_y / (N_y - 1)), h_z(D_z / (N_z - 1)),
 h_x2(h_x * h_x), h_y2(h_y * h_y), h_z2(h_z * h_z),
@@ -26,7 +26,7 @@ float JacobiSolver3D::solve() {
         isendrecvBorders();
         float locCoreDiff = calcCore();
         waitBorders();
-        float locBorderDiff = calcBorder();
+        float locBorderDiff = calcBorders();
         float locDiff = std::max(locCoreDiff, locBorderDiff);
 
         MPI_Allreduce(&locDiff, &globDiff, 1, MPI_FLOAT,
@@ -88,7 +88,7 @@ float JacobiSolver3D::calcCore() {
     return maxDiff;
 }
 
-float JacobiSolver3D::calcBorder() {
+float JacobiSolver3D::calcBorders() {
     float maxDiff = 0;
     for (int j = 1; j < N_y - 1; j++) {
         for (int k = 1; k < N_z - 1; k++) {

@@ -5,7 +5,7 @@
 #include <algorithm>
 #include "JacobiSolver3D.h"
 
-#define LOOPS 1
+#define LOOPS 8
 
 int main(int argc, char **argv) {
     MPI_Init(&argc, &argv);
@@ -26,6 +26,8 @@ int main(int argc, char **argv) {
     if (rank == 0) {
         std::cout << "Time taken: " << duration << " sec" << std::endl;
         std::cout << "Max diff: " << diff << std::endl;
+        std::cout << "================================" <<
+                     "================================" << std::endl;
     }
 
     MPI_Finalize();

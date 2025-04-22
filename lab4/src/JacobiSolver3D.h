@@ -15,7 +15,7 @@ class JacobiSolver3D {
     void initBuffers();
 
     float calcCore();
-    float calcBorder();
+    float calcBorders();
 
     void isendrecvBorders();
     void waitBorders();
